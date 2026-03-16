@@ -1,0 +1,7 @@
+node_modules/
+out/
+dist/
+python-core/
+*.log
+.DS_Store
+Thumbs.db

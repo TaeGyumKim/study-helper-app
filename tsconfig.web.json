@@ -1,0 +1,13 @@
+{
+  "extends": "@electron-toolkit/eslint-config-ts/tsconfig.web.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./out",
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "paths": {
+      "@renderer/*": ["src/renderer/src/*"]
+    }
+  },
+  "include": ["src/renderer/src/**/*"]
+}

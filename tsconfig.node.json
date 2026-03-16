@@ -1,0 +1,12 @@
+{
+  "extends": "@electron-toolkit/eslint-config-ts/tsconfig.node.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./out",
+    "baseUrl": ".",
+    "paths": {
+      "@main/*": ["src/main/*"]
+    }
+  },
+  "include": ["src/main/**/*", "src/preload/**/*", "electron.vite.config.ts"]
+}
