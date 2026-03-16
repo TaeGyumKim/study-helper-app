@@ -1,10 +1,15 @@
 {
-  "extends": "@electron-toolkit/eslint-config-ts/tsconfig.web.json",
   "compilerOptions": {
     "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
     "outDir": "./out",
     "baseUrl": ".",
+    "strict": true,
     "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "paths": {
       "@renderer/*": ["src/renderer/src/*"]
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, updateSettings, updateTelegram, verifyTelegram } from '../api/client'
+import { getSettings, initApiClient, updateSettings, updateTelegram, verifyTelegram } from '../api/client'
 
 function Settings(): JSX.Element {
   const navigate = useNavigate()
@@ -26,7 +26,6 @@ function Settings(): JSX.Element {
         const status = await window.electronAPI.getPythonStatus()
         setPythonOk(status.running)
         if (status.running) {
-          const { initApiClient } = await import('../api/client')
           await initApiClient()
           const s = await getSettings()
           setSettings(s)
