@@ -74,12 +74,17 @@ export async function ensureLoggedIn(
   return performLogin(win, username, password)
 }
 
-/** 페이지 로드 완료 대기. */
-function waitForLoad(win: BrowserWindow): Promise<void> {
-  return new Promise((resolve) => {
+/** 페이지 로드 완료 대기 (타임아웃 30초). */
+function waitForLoad(win: BrowserWindow, timeout = LOGIN_TIMEOUT): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeout
     const check = (): void => {
       if (!win.webContents.isLoading()) {
         resolve()
+        return
+      }
+      if (Date.now() > deadline) {
+        reject(new Error('Page load timeout'))
         return
       }
       setTimeout(check, 200)

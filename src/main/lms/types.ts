@@ -106,9 +106,11 @@ export function createCourse(raw: {
   let longName = raw.longName || ''
   // LMS API가 "과목명 - 과목명" 형태로 중복 반환하는 경우 앞쪽만 사용
   if (longName.includes(' - ')) {
-    const [first, , second] = longName.split(' - ')
-    if (first?.trim() === second?.trim()) {
-      longName = first.trim()
+    const idx = longName.indexOf(' - ')
+    const first = longName.slice(0, idx).trim()
+    const second = longName.slice(idx + 3).trim()
+    if (first === second) {
+      longName = first
     }
   }
   return {

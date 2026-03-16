@@ -111,10 +111,15 @@ export function runPipeline(
   request: Record<string, unknown>,
   onMessage: (msg: PipelineMessage) => void
 ): WebSocket {
-  const wsUrl = `ws://127.0.0.1:${_baseUrl.split(':').pop()}/download/pipeline`
+  const port = new URL(_baseUrl).port || '18090'
+  const wsUrl = `ws://127.0.0.1:${port}/download/pipeline`
   const ws = new WebSocket(wsUrl)
 
   ws.onopen = () => {
+    // 토큰 인증 (서버가 첫 메시지로 토큰을 요구)
+    if (_token) {
+      ws.send(JSON.stringify({ token: _token }))
+    }
     ws.send(JSON.stringify(request))
   }
 

@@ -50,18 +50,22 @@ function Settings(): JSX.Element {
     setSaving(true)
     setMessage('')
     try {
-      await updateSettings({
+      const settingsPayload: Record<string, unknown> = {
         download_rule: downloadRule,
         stt_enabled: sttEnabled,
         ai_enabled: aiEnabled,
-        ai_agent: aiAgent,
-        api_key: apiKey
-      })
-      await updateTelegram({
+        ai_agent: aiAgent
+      }
+      // API 키가 입력된 경우에만 저장 (빈 값으로 덮어쓰기 방지)
+      if (apiKey) settingsPayload.api_key = apiKey
+      await updateSettings(settingsPayload)
+
+      const tgPayload: Record<string, unknown> = {
         enabled: tgEnabled,
-        bot_token: tgToken,
         chat_id: tgChatId
-      })
+      }
+      if (tgToken) tgPayload.bot_token = tgToken
+      await updateTelegram(tgPayload)
       setMessage('설정이 저장되었습니다.')
     } catch (e) {
       setMessage(`저장 실패: ${e}`)

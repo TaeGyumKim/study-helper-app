@@ -25,9 +25,8 @@ function getLmsWindow(): BrowserWindow {
     width: 1280,
     height: 720,
     webPreferences: {
-      contextIsolation: false,
+      contextIsolation: true,
       nodeIntegration: false,
-      // LMS 페이지에서 media 자동재생 허용
       autoplayPolicy: 'no-user-gesture-required'
     }
   })
@@ -105,7 +104,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
             width: 1280,
             height: 720,
             webPreferences: {
-              contextIsolation: false,
+              contextIsolation: true,
               nodeIntegration: false
             }
           })
@@ -124,7 +123,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
           } finally {
             win.destroy()
             completed++
-            mainWindow.webContents.send('lms:loading-progress', {
+            !mainWindow.isDestroyed() && mainWindow.webContents.send('lms:loading-progress', {
               completed,
               total: courses.length
             })
@@ -144,7 +143,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const win = getLmsWindow()
 
       const onProgress = (state: PlaybackState): void => {
-        mainWindow.webContents.send('lms:play-progress', state)
+        !mainWindow.isDestroyed() && mainWindow.webContents.send('lms:play-progress', state)
       }
 
       const logLines: string[] = []
@@ -155,7 +154,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const result = await playLecture(win, lectureUrl, onProgress, fallbackDuration, logFn)
 
       // 로그를 결과와 함께 전달
-      mainWindow.webContents.send('lms:play-log', logLines)
+      !mainWindow.isDestroyed() && mainWindow.webContents.send('lms:play-log', logLines)
 
       return result
     }

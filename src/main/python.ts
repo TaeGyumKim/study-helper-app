@@ -38,7 +38,10 @@ export class PythonCore {
    * Python 코어 FastAPI 서버를 시작한다.
    */
   async start(): Promise<void> {
-    this._token = randomBytes(32).toString('hex')
+    // 재시작 시 기존 토큰을 유지 (렌더러 캐시와 동기화)
+    if (!this._token) {
+      this._token = randomBytes(32).toString('hex')
+    }
     this._port = DEFAULT_PORT
 
     const pythonPath = this.resolvePythonPath()
@@ -93,18 +96,18 @@ export class PythonCore {
 
     if (this.process) {
       console.log('[PythonCore] Stopping...')
-      this.process.kill('SIGTERM')
-
-      // 3초 후에도 살아있으면 강제 종료
-      setTimeout(() => {
-        if (this.process && !this.process.killed) {
-          console.log('[PythonCore] Force killing...')
-          this.process.kill('SIGKILL')
-        }
-      }, 3000)
-
+      const proc = this.process
+      proc.kill('SIGTERM')
       this.process = null
       this._isRunning = false
+
+      // 3초 후에도 살아있으면 강제 종료 (로컬 변수로 캡처)
+      setTimeout(() => {
+        if (!proc.killed) {
+          console.log('[PythonCore] Force killing...')
+          proc.kill('SIGKILL')
+        }
+      }, 3000)
     }
   }
 
@@ -167,8 +170,10 @@ export class PythonCore {
     } catch {
       console.warn('[PythonCore] Health check failed, restarting...')
       this._isRunning = false
+      const prevToken = this._token // 토큰 유지 (렌더러 캐시와 동기화)
       this.stop()
       try {
+        this._token = prevToken // 재시작 시 같은 토큰 사용
         await this.start()
       } catch (e) {
         console.error('[PythonCore] Restart failed:', e)

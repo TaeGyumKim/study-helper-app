@@ -17,7 +17,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false, // LMS IPC 통신을 위해 sandbox 비활성화
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -28,7 +28,10 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // HTTP(S) 스킴만 외부 브라우저로 열기 (javascript:, file: 등 차단)
+    if (details.url.startsWith('https://') || details.url.startsWith('http://')) {
+      shell.openExternal(details.url)
+    }
     return { action: 'deny' }
   })
 

@@ -1,20 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { Course, CourseDetail as CourseDetailType, LectureItem } from '../../../main/lms/types'
+import type { CourseDetail as CourseDetailType, LectureItem } from '../../../main/lms/types'
 
 function CourseDetail(): JSX.Element {
   const { courseIdx } = useParams<{ courseIdx: string }>()
   const navigate = useNavigate()
   const [detail, setDetail] = useState<CourseDetailType | null>(null)
   const [loading, setLoading] = useState(true)
-  const [playing, setPlaying] = useState<string | null>(null) // 재생 중인 강의 URL
+  const [playing, setPlaying] = useState<string | null>(null)
+  const detailRef = useRef<CourseDetailType | null>(null)
+
+  // ref를 최신 detail과 동기화
+  useEffect(() => {
+    detailRef.current = detail
+  }, [detail])
+
+  const loadDetail = useCallback(async (): Promise<void> => {
+    const cur = detailRef.current
+    if (!cur) return
+    try {
+      const d = await window.electronAPI.fetchLectures(cur.course)
+      setDetail(d)
+    } catch {
+      // 무시
+    }
+  }, [])
 
   useEffect(() => {
     async function load(): Promise<void> {
       try {
         const courses = await window.electronAPI.fetchCourses()
         const idx = parseInt(courseIdx || '0')
-        if (idx >= courses.length) {
+        if (idx < 0 || idx >= courses.length) {
           navigate('/courses')
           return
         }
@@ -34,22 +51,11 @@ function CourseDetail(): JSX.Element {
     const unsub = window.electronAPI.onPlayProgress((state) => {
       if (state.ended) {
         setPlaying(null)
-        // 강의 목록 새로고침
         loadDetail()
       }
     })
     return unsub
-  }, [])
-
-  async function loadDetail(): Promise<void> {
-    if (!detail) return
-    try {
-      const d = await window.electronAPI.fetchLectures(detail.course)
-      setDetail(d)
-    } catch {
-      // 무시
-    }
-  }
+  }, [loadDetail])
 
   async function handlePlay(lec: LectureItem): Promise<void> {
     setPlaying(lec.fullUrl)
