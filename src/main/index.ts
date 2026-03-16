@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { PythonCore } from './python'
+import { registerIpcHandlers } from './ipc'
 
 let mainWindow: BrowserWindow | null = null
 let pythonCore: PythonCore | null = null
@@ -16,7 +17,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: true,
+      sandbox: false, // LMS IPC 통신을 위해 sandbox 비활성화
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -30,6 +31,9 @@ function createWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  // LMS 자동화 IPC 핸들러 등록
+  registerIpcHandlers(mainWindow)
 
   // Dev: vite dev server / Prod: 빌드된 HTML
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -48,12 +52,18 @@ app.whenReady().then(async () => {
 
   // Python 코어 프로세스 시작
   pythonCore = new PythonCore()
-  await pythonCore.start()
+  try {
+    await pythonCore.start()
+  } catch (e) {
+    console.error('[PythonCore] 시작 실패 — STT/AI 기능 비활성화:', e)
+    // Python 없이도 LMS 자동화는 동작
+  }
 
   // IPC: Python API 정보를 렌더러에 전달
   ipcMain.handle('get-api-info', () => ({
     port: pythonCore?.port ?? 18090,
-    token: pythonCore?.token ?? ''
+    token: pythonCore?.token ?? '',
+    running: pythonCore?.isRunning ?? false
   }))
 
   // IPC: Python 코어 상태 확인
