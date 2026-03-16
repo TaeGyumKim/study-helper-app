@@ -6,6 +6,8 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!scripts/*'
+  - '!build/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
@@ -23,6 +25,8 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   artifactName: ${name}-${version}-setup.${ext}
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
 mac:
   target:
     - target: dmg
@@ -30,11 +34,20 @@ mac:
         - x64
         - arm64
   icon: resources/icon.icns
+  category: public.app-category.education
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   target:
     - target: AppImage
       arch: x64
   icon: resources/icon.png
+  category: Education
+publish:
+  provider: github
+  owner: TaeGyumKim
+  repo: study-helper-app

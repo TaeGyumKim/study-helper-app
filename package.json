@@ -8,9 +8,13 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
+    "build:core": "python scripts/build-core.py",
+    "build:core:clean": "python scripts/build-core.py --clean",
     "build:win": "npm run build && electron-builder --win --config",
     "build:mac": "npm run build && electron-builder --mac --config",
     "build:linux": "npm run build && electron-builder --linux --config",
+    "dist:win": "npm run build:core && npm run build:win",
+    "dist:mac": "npm run build:core && npm run build:mac",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
