@@ -6,7 +6,7 @@
  * 결과만 renderer에 전달한다.
  */
 
-import { BrowserWindow, ipcMain, session } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { fetchCourses } from './lms/courses'
 import { fetchLectures } from './lms/lectures'
 import { playLecture } from './lms/player'
@@ -27,16 +27,17 @@ function getLmsWindow(): BrowserWindow {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
-  // 사용자 에이전트 설정
-  lmsWindow.webContents.setUserAgent(
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
-      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-      'Chrome/122.0.0.0 Safari/537.36'
-  )
+  // 사용자 에이전트 설정 (플랫폼별)
+  const ua =
+    process.platform === 'darwin'
+      ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+  lmsWindow.webContents.setUserAgent(ua)
 
   lmsWindow.on('closed', () => {
     lmsWindow = null
@@ -105,7 +106,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
             height: 720,
             webPreferences: {
               contextIsolation: true,
-              nodeIntegration: false
+              nodeIntegration: false,
+              sandbox: true
             }
           })
           win.webContents.setUserAgent(getLmsWindow().webContents.getUserAgent())
@@ -175,5 +177,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       lmsWindow.destroy()
       lmsWindow = null
     }
+    // 메모리 내 평문 자격증명 초기화
+    _username = ''
+    _password = ''
   })
 }

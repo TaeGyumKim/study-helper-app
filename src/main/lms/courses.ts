@@ -19,11 +19,14 @@ export async function fetchCourses(
 ): Promise<Course[]> {
   const wc = win.webContents
 
-  // 대시보드로 이동
-  await win.loadURL(DASHBOARD_URL)
+  // 대시보드로 이동 (이미 대시보드에 있으면 스킵)
+  const currentUrl = wc.getURL()
+  if (!currentUrl.startsWith(BASE_URL) || currentUrl.includes('login')) {
+    await win.loadURL(DASHBOARD_URL)
+  }
 
   // 세션 만료 시 재로그인
-  if (wc.getURL().includes('login')) {
+  if (wc.getURL().includes('login') || wc.getURL().includes('sso')) {
     const ok = await ensureLoggedIn(win, username, password)
     if (!ok) throw new Error('로그인 실패')
     await win.loadURL(DASHBOARD_URL)

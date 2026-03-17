@@ -8,7 +8,6 @@ import {
   Course,
   CourseDetail,
   LectureItem,
-  LectureType,
   TYPE_CLASS_MAP,
   Week,
   createCourseDetail,
@@ -16,6 +15,7 @@ import {
   createWeek
 } from './types'
 import { ensureLoggedIn } from './auth'
+import { waitForSelector } from './utils'
 
 /**
  * 과목의 주차별 강의 목록을 스크래핑한다.
@@ -184,7 +184,7 @@ export async function fetchLectures(
     })();
   `)
 
-  if (!result) {
+  if (!result || typeof result !== 'object' || !Array.isArray(result.weeks)) {
     throw new Error('강의 목록을 파싱할 수 없습니다.')
   }
 
@@ -200,19 +200,3 @@ export async function fetchLectures(
   return createCourseDetail(course, result.courseName || course.longName, result.professors || '', weeks)
 }
 
-/** CSS 셀렉터 대기 (polling). */
-async function waitForSelector(
-  wc: Electron.WebContents,
-  selector: string,
-  timeout: number
-): Promise<void> {
-  const start = Date.now()
-  while (Date.now() - start < timeout) {
-    const found = await wc.executeJavaScript(
-      `!!document.querySelector(${JSON.stringify(selector)})`
-    )
-    if (found) return
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  throw new Error(`Selector timeout: ${selector}`)
-}

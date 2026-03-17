@@ -5,7 +5,7 @@
  * 헬스 체크, 종료, 재시작을 관리한다.
  */
 
-import { ChildProcess, spawn } from 'child_process'
+import { ChildProcess, execSync, spawn } from 'child_process'
 import { randomBytes } from 'crypto'
 import { app } from 'electron'
 import { join } from 'path'
@@ -64,6 +64,16 @@ export class PythonCore {
       stdio: ['pipe', 'pipe', 'pipe']
     })
 
+    // spawn error 핸들링 (ENOENT 등) — uncaught exception 방지
+    const spawnReady = new Promise<void>((resolve, reject) => {
+      this.process!.on('error', (err) => {
+        console.error(`[PythonCore] Spawn error: ${err.message}`)
+        this._isRunning = false
+        reject(err)
+      })
+      this.process!.on('spawn', () => resolve())
+    })
+
     this.process.stdout?.on('data', (data: Buffer) => {
       console.log(`[Python] ${data.toString().trim()}`)
     })
@@ -76,6 +86,9 @@ export class PythonCore {
       console.log(`[PythonCore] Process exited with code ${code}`)
       this._isRunning = false
     })
+
+    // 프로세스 spawn 대기 (ENOENT면 여기서 throw)
+    await spawnReady
 
     // 서버 시작 대기
     await this.waitForReady()
@@ -121,7 +134,19 @@ export class PythonCore {
       return join(process.resourcesPath, 'python-core', `study-helper-core${ext}`)
     }
     // 개발 모드: 시스템 python 사용
-    return platform() === 'win32' ? 'python' : 'python3'
+    // Windows에서는 python, python3 순서로 탐색
+    if (platform() === 'win32') {
+      for (const cmd of ['python', 'python3', 'py']) {
+        try {
+          execSync(`${cmd} --version`, { stdio: 'pipe', timeout: 5000 })
+          return cmd
+        } catch {
+          // 다음 후보 시도
+        }
+      }
+      return 'python'
+    }
+    return 'python3'
   }
 
   /**
@@ -132,7 +157,8 @@ export class PythonCore {
       return join(process.resourcesPath, 'python-core')
     }
     // 개발 모드: study-helper 프로젝트가 형제 디렉토리에 있다고 가정
-    return join(__dirname, '..', '..', '..', '..', 'study-helper')
+    // 빌드 후 __dirname = <project>/out/main → ../../ = <project>/ → ../ = 부모(ssu/)
+    return join(__dirname, '..', '..', '..', 'study-helper')
   }
 
   /**
