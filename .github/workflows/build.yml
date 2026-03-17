@@ -61,17 +61,14 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v4
 
+      # study-helper 코어를 워크스페이스 내부에 checkout
+      # (Private repo인 경우 PAT 토큰을 CORE_TOKEN secret으로 등록)
       - name: Checkout core
         uses: actions/checkout@v4
         with:
           repository: TaeGyumKim/study-helper
-          path: study-helper-core
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Move core to sibling directory
-        run: |
-          mv study-helper-core ../study-helper
-        shell: bash
+          path: study-helper
+          token: ${{ secrets.CORE_TOKEN != '' && secrets.CORE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -86,11 +83,11 @@ jobs:
           architecture: ${{ matrix.python-arch }}
 
       - name: Install Python dependencies
+        shell: bash
         run: |
-          cd ../study-helper
+          cd study-helper
           pip install -e ".[dev]"
           pip install pyinstaller
-        shell: bash
 
       - name: Install ffmpeg (macOS)
         if: runner.os == 'macOS'
@@ -98,16 +95,19 @@ jobs:
 
       - name: Install ffmpeg (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: choco install ffmpeg -y
-        shell: bash
 
       - name: Sync version to package.json
-        run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
         shell: bash
+        run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Build Python core
-        run: python scripts/build-core.py
         shell: bash
+        env:
+          # build-core.py가 형제 디렉토리 대신 워크스페이스 내 study-helper를 참조
+          STUDY_HELPER_CORE_DIR: ${{ github.workspace }}/study-helper
+        run: python scripts/build-core.py
 
       - name: Install Node dependencies
         run: npm ci
@@ -116,22 +116,20 @@ jobs:
         run: npm run build
 
       - name: Package (${{ matrix.platform }})
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Windows: 코드 서명 비활성화 (개인 프로젝트)
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # macOS 코드 서명 (선택 — secrets 없으면 자동 스킵)
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --${{ matrix.platform }} --config --publish never
-        shell: bash
 
       - name: List build artifacts
-        run: ls -lh dist/ || dir dist
         shell: bash
+        run: ls -lh dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -152,46 +150,46 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: false
 
       - name: Collect release files
+        shell: bash
         run: |
           mkdir -p release
           find artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" \) -exec cp {} release/ \;
+          echo "=== Release files ==="
           ls -lh release/
-        shell: bash
 
       - name: Generate release notes
-        id: notes
+        shell: bash
         run: |
-          TAG="${{ needs.prepare.outputs.tag }}"
           VER="${{ needs.prepare.outputs.version }}"
-          cat > release-notes.md << 'NOTES'
-          ## Study Helper $VER
+          cat > release-notes.md << EOF
+          ## Study Helper ${VER}
 
           ### 다운로드
 
           | 플랫폼 | 파일 |
           |--------|------|
-          | Windows | `study-helper-app-$VER-setup.exe` |
-          | macOS (Intel) | `Study Helper-$VER-x64.dmg` |
-          | macOS (Apple Silicon) | `Study Helper-$VER-arm64.dmg` |
+          | Windows | \`study-helper-app-${VER}-setup.exe\` |
+          | macOS (Intel) | \`Study Helper-${VER}-x64.dmg\` |
+          | macOS (Apple Silicon) | \`Study Helper-${VER}-arm64.dmg\` |
 
           ### 설치 방법
 
           **Windows**: exe 파일 실행 → 설치 경로 선택 → 완료
           **macOS**: dmg 열기 → Applications 폴더로 드래그
 
-          ### 주요 변경사항
+          ### 최근 변경사항
 
-          최신 커밋 로그를 참조하세요.
-          NOTES
-          sed -i "s/\$VER/$VER/g" release-notes.md
+          $(git log --oneline -10 --no-decorate)
+          EOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

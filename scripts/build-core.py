@@ -24,7 +24,8 @@ from pathlib import Path
 
 # 프로젝트 루트 (study-helper-app/)
 APP_ROOT = Path(__file__).parent.parent
-CORE_ROOT = APP_ROOT.parent / "study-helper"  # 형제 디렉토리
+# CI: STUDY_HELPER_CORE_DIR 환경변수 / 로컬: 형제 디렉토리
+CORE_ROOT = Path(os.environ.get("STUDY_HELPER_CORE_DIR", str(APP_ROOT.parent / "study-helper")))
 OUTPUT_DIR = APP_ROOT / "python-core"
 DIST_DIR = APP_ROOT / "build" / "pyinstaller-dist"
 WORK_DIR = APP_ROOT / "build" / "pyinstaller-work"
