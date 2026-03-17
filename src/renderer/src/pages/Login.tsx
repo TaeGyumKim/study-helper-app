@@ -1,12 +1,40 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 function Login(): JSX.Element {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [rememberMe, setRememberMe] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'auto' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+
+  // 저장된 로그인 정보 자동 로드
+  useEffect(() => {
+    async function tryAutoLogin(): Promise<void> {
+      try {
+        const cred = await window.electronAPI.loadCredentials()
+        if (cred) {
+          setUsername(cred.username)
+          setPassword(cred.password)
+          setRememberMe(true)
+
+          // 자동 로그인 시도
+          setStatus('auto')
+          const ok = await window.electronAPI.login(cred.username, cred.password)
+          if (ok) {
+            navigate('/courses')
+            return
+          }
+          setStatus('idle')
+          setErrorMsg('저장된 정보로 자동 로그인 실패. 다시 시도하세요.')
+        }
+      } catch {
+        setStatus('idle')
+      }
+    }
+    tryAutoLogin()
+  }, [navigate])
 
   async function handleLogin(): Promise<void> {
     if (!username.trim() || !password.trim()) {
@@ -19,6 +47,12 @@ function Login(): JSX.Element {
     try {
       const ok = await window.electronAPI.login(username.trim(), password)
       if (ok) {
+        // 로그인 성공 시 정보 저장/삭제
+        if (rememberMe) {
+          await window.electronAPI.saveCredentials(username.trim(), password)
+        } else {
+          await window.electronAPI.clearCredentials()
+        }
         navigate('/courses')
       } else {
         setStatus('error')
@@ -26,12 +60,23 @@ function Login(): JSX.Element {
       }
     } catch (e) {
       setStatus('error')
-      setErrorMsg(`오류: ${e}`)
+      setErrorMsg(`오류: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   function handleKeyDown(e: React.KeyboardEvent): void {
     if (e.key === 'Enter') handleLogin()
+  }
+
+  if (status === 'auto') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">자동 로그인 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -76,9 +121,17 @@ function Login(): JSX.Element {
             />
           </div>
 
-          {errorMsg && (
-            <p className="text-sm text-red-500">{errorMsg}</p>
-          )}
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">로그인 정보 저장</span>
+          </label>
+
+          {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
 
           <button
             onClick={handleLogin}

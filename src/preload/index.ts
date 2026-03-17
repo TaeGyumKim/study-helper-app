@@ -43,6 +43,19 @@ const api = {
   /** LMS 윈도우 정리. */
   cleanup: (): Promise<void> => ipcRenderer.invoke('lms:cleanup'),
 
+  // ── 자격 증명 저장 (safeStorage) ─────────────────────────────
+
+  /** 로그인 정보 암호화 저장. */
+  saveCredentials: (username: string, password: string): Promise<boolean> =>
+    ipcRenderer.invoke('credentials:save', username, password),
+
+  /** 저장된 로그인 정보 로드. */
+  loadCredentials: (): Promise<{ username: string; password: string } | null> =>
+    ipcRenderer.invoke('credentials:load'),
+
+  /** 저장된 로그인 정보 삭제. */
+  clearCredentials: (): Promise<boolean> => ipcRenderer.invoke('credentials:clear'),
+
   // ── 이벤트 리스너 ─────────────────────────────────────────────
 
   /** 재생 진행률 수신. */

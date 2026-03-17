@@ -21,6 +21,11 @@ declare global {
       extractVideoUrl: (lectureUrl: string) => Promise<string | null>
       cleanup: () => Promise<void>
 
+      // Credentials (safeStorage)
+      saveCredentials: (username: string, password: string) => Promise<boolean>
+      loadCredentials: () => Promise<{ username: string; password: string } | null>
+      clearCredentials: () => Promise<boolean>
+
       // Events
       onPlayProgress: (callback: (state: PlaybackState) => void) => () => void
       onLoadingProgress: (callback: (data: { completed: number; total: number }) => void) => () => void
