@@ -15,11 +15,16 @@ Python 코어를 PyInstaller로 번들링한다.
     - Whisper 모델은 런타임에 다운로드됨 (번들 미포함)
 """
 
+import io
 import os
+import sys
+
+# Windows CI의 cp1252 인코딩 에러 방지
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import platform
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 # 프로젝트 루트 (study-helper-app/)

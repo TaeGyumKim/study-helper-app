@@ -35,13 +35,11 @@ mac:
       arch:
         - x64
         - arm64
-  icon: resources/icon.icns
   category: public.app-category.education
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  notarize: true
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
 linux:
