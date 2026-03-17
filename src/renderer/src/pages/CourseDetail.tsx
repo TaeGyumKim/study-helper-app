@@ -7,6 +7,7 @@ import {
   type PipelineMessage,
   type PipelineComplete
 } from '../api/client'
+import { getStore, updateDetail } from '../store'
 
 // ── 파이프라인 모달 ───────────────────────────────────────────
 
@@ -158,17 +159,29 @@ function CourseDetail(): JSX.Element {
 
   useEffect(() => {
     async function load(): Promise<void> {
+      const store = getStore()
+      const idx = parseInt(courseIdx || '0')
+
+      // 캐시에서 course 조회 (fetchCourses 재호출 불필요)
+      if (idx < 0 || idx >= store.courses.length) {
+        navigate('/courses')
+        return
+      }
+
+      // 캐시에 상세 정보가 있으면 우선 표시
+      const cached = store.details[idx]
+      if (cached) {
+        setDetail(cached)
+        setLoading(false)
+      }
+
+      // 최신 데이터 로드 (캐시 유무와 무관하게)
       try {
-        const courses = await window.electronAPI.fetchCourses()
-        const idx = parseInt(courseIdx || '0')
-        if (idx < 0 || idx >= courses.length) {
-          navigate('/courses')
-          return
-        }
-        const d = await window.electronAPI.fetchLectures(courses[idx])
+        const d = await window.electronAPI.fetchLectures(store.courses[idx])
         setDetail(d)
+        updateDetail(idx, d)
       } catch (e) {
-        console.error(e)
+        if (!cached) console.error(e)
       } finally {
         setLoading(false)
       }

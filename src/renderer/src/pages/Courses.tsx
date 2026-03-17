@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Course, CourseDetail } from '../../../main/lms/types'
+import { getStore, setCourses, setDetails } from '../store'
 
 function Courses(): JSX.Element {
   const navigate = useNavigate()
-  const [courses, setCourses] = useState<Course[]>([])
-  const [details, setDetails] = useState<(CourseDetail | null)[]>([])
-  const [loading, setLoading] = useState(true)
+  const store = getStore()
+
+  const [courses, setCoursesLocal] = useState<Course[]>(store.courses)
+  const [details, setDetailsLocal] = useState<(CourseDetail | null)[]>(store.details)
+  const [loading, setLoading] = useState(!store.loaded)
   const [loadingProgress, setLoadingProgress] = useState({ completed: 0, total: 0 })
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // 이미 로드된 데이터가 있으면 재로딩 스킵
+    if (store.loaded) return
+
     let cancelled = false
 
     const unsubProgress = window.electronAPI.onLoadingProgress((data) => {
@@ -21,14 +27,16 @@ function Courses(): JSX.Element {
       try {
         const courseList = await window.electronAPI.fetchCourses()
         if (cancelled) return
+        setCoursesLocal(courseList)
         setCourses(courseList)
         setLoadingProgress({ completed: 0, total: courseList.length })
 
         const detailList = await window.electronAPI.fetchAllDetails(courseList)
         if (cancelled) return
+        setDetailsLocal(detailList)
         setDetails(detailList)
       } catch (e) {
-        if (!cancelled) setError(`과목 로드 실패: ${e}`)
+        if (!cancelled) setError(`과목 로드 실패: ${e instanceof Error ? e.message : String(e)}`)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -74,7 +82,6 @@ function Courses(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 헤더 */}
       <div className="border-b bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">수강 과목</h1>
@@ -87,7 +94,6 @@ function Courses(): JSX.Element {
         </div>
       </div>
 
-      {/* 과목 카드 */}
       <div className="p-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((course, i) => {

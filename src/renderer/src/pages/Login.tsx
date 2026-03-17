@@ -9,7 +9,7 @@ function Login(): JSX.Element {
   const [status, setStatus] = useState<'idle' | 'loading' | 'auto' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
-  // 저장된 로그인 정보 자동 로드
+  // 저장된 로그인 정보 → 자동 로그인 → 과목 목록 직행
   useEffect(() => {
     async function tryAutoLogin(): Promise<void> {
       try {
@@ -19,10 +19,10 @@ function Login(): JSX.Element {
           setPassword(cred.password)
           setRememberMe(true)
 
-          // 자동 로그인 시도
           setStatus('auto')
           const ok = await window.electronAPI.login(cred.username, cred.password)
           if (ok) {
+            // 재방문 — 바로 과목 목록으로
             navigate('/courses')
             return
           }
@@ -47,13 +47,24 @@ function Login(): JSX.Element {
     try {
       const ok = await window.electronAPI.login(username.trim(), password)
       if (ok) {
-        // 로그인 성공 시 정보 저장/삭제
         if (rememberMe) {
           await window.electronAPI.saveCredentials(username.trim(), password)
         } else {
           await window.electronAPI.clearCredentials()
         }
-        navigate('/courses')
+
+        // 최초 로그인 여부 확인 — 저장된 credential이 없었으면 온보딩
+        const hadCredentials = await window.electronAPI.loadCredentials()
+        if (!hadCredentials && !rememberMe) {
+          // 정보 저장 안 한 최초 유저 → 온보딩
+          navigate('/onboarding')
+        } else if (rememberMe) {
+          // 방금 저장한 경우 → 최초 로그인이므로 온보딩
+          // (이미 저장된 유저가 재로그인하면 위 useEffect에서 처리됨)
+          navigate('/onboarding')
+        } else {
+          navigate('/courses')
+        }
       } else {
         setStatus('error')
         setErrorMsg('로그인 실패. 학번과 비밀번호를 확인하세요.')
@@ -91,9 +102,7 @@ function Login(): JSX.Element {
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              학번
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">학번</label>
             <input
               type="text"
               value={username}
@@ -107,9 +116,7 @@ function Login(): JSX.Element {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              비밀번호
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">비밀번호</label>
             <input
               type="password"
               value={password}
