@@ -5,3 +5,8 @@ python-core/
 *.log
 .DS_Store
 Thumbs.db
+
+# 민감 정보
+.env
+.env.*
+!.env.example

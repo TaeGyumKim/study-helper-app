@@ -121,15 +121,69 @@ def copy_to_output():
 
 def download_ffmpeg():
     """플랫폼별 정적 ffmpeg 바이너리를 다운로드한다."""
-    ffmpeg_path = OUTPUT_DIR / ("ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
+    is_win = platform.system() == "Windows"
+    ffmpeg_path = OUTPUT_DIR / ("ffmpeg.exe" if is_win else "ffmpeg")
     if ffmpeg_path.exists():
         print(f"[SKIP] ffmpeg 이미 존재: {ffmpeg_path}")
         return
 
-    print("[INFO] ffmpeg는 별도로 다운로드해야 합니다:")
-    print("       Windows: https://github.com/BtbN/FFmpeg-Builds/releases")
-    print("       macOS:   brew install ffmpeg 또는 정적 빌드 다운로드")
-    print(f"       → {ffmpeg_path} 에 배치하세요")
+    import urllib.request
+    import zipfile
+    import tarfile
+
+    if is_win:
+        url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+        archive = OUTPUT_DIR / "ffmpeg.zip"
+        print(f"[DOWNLOAD] ffmpeg (Windows)...")
+        urllib.request.urlretrieve(url, archive)
+        with zipfile.ZipFile(archive) as zf:
+            for name in zf.namelist():
+                if name.endswith("bin/ffmpeg.exe"):
+                    with open(ffmpeg_path, "wb") as f:
+                        f.write(zf.read(name))
+                    break
+        archive.unlink()
+    elif platform.system() == "Darwin":
+        # macOS: evermeet.cx 정적 빌드 (arm64/x64 유니버설)
+        url = "https://evermeet.cx/ffmpeg/getrelease/zip"
+        archive = OUTPUT_DIR / "ffmpeg.zip"
+        print(f"[DOWNLOAD] ffmpeg (macOS)...")
+        try:
+            urllib.request.urlretrieve(url, archive)
+            with zipfile.ZipFile(archive) as zf:
+                zf.extract("ffmpeg", OUTPUT_DIR)
+            archive.unlink()
+            os.chmod(ffmpeg_path, 0o755)
+        except Exception as e:
+            print(f"[WARN] ffmpeg 자동 다운로드 실패: {e}")
+            print("       수동으로 다운로드하세요: brew install ffmpeg")
+            print(f"       → {ffmpeg_path} 에 배치하세요")
+            return
+    else:
+        # Linux: johnvansickle 정적 빌드
+        arch = "amd64" if platform.machine() == "x86_64" else "arm64"
+        url = f"https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-{arch}-static.tar.xz"
+        archive = OUTPUT_DIR / "ffmpeg.tar.xz"
+        print(f"[DOWNLOAD] ffmpeg (Linux {arch})...")
+        try:
+            urllib.request.urlretrieve(url, archive)
+            with tarfile.open(archive) as tf:
+                for member in tf.getmembers():
+                    if member.name.endswith("/ffmpeg"):
+                        member.name = "ffmpeg"
+                        tf.extract(member, OUTPUT_DIR)
+                        break
+            archive.unlink()
+            os.chmod(ffmpeg_path, 0o755)
+        except Exception as e:
+            print(f"[WARN] ffmpeg 자동 다운로드 실패: {e}")
+            print(f"       → {ffmpeg_path} 에 배치하세요")
+            return
+
+    if ffmpeg_path.exists():
+        print(f"[OK] ffmpeg: {ffmpeg_path}")
+    else:
+        print(f"[WARN] ffmpeg 다운로드 완료했으나 파일을 찾을 수 없습니다: {ffmpeg_path}")
 
 
 def main():
