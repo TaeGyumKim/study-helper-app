@@ -2,6 +2,8 @@
   "name": "study-helper-app",
   "version": "1.0.0",
   "description": "Study Helper Desktop App — LMS 학습 도우미",
+  "author": "TaeGyumKim",
+  "license": "MIT",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

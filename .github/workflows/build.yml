@@ -61,14 +61,12 @@ jobs:
       - name: Checkout app
         uses: actions/checkout@v4
 
-      # study-helper 코어를 워크스페이스 내부에 checkout
-      # (Private repo인 경우 PAT 토큰을 CORE_TOKEN secret으로 등록)
-      - name: Checkout core
+      # Public repo — 토큰 불필요
+      - name: Checkout core (study-helper)
         uses: actions/checkout@v4
         with:
           repository: TaeGyumKim/study-helper
           path: study-helper
-          token: ${{ secrets.CORE_TOKEN != '' && secrets.CORE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -76,7 +74,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Setup Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -102,17 +100,16 @@ jobs:
         shell: bash
         run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
 
-      - name: Build Python core
+      - name: Build Python core (PyInstaller)
         shell: bash
         env:
-          # build-core.py가 형제 디렉토리 대신 워크스페이스 내 study-helper를 참조
           STUDY_HELPER_CORE_DIR: ${{ github.workspace }}/study-helper
         run: python scripts/build-core.py
 
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Electron app
+      - name: Build Electron app (electron-vite)
         run: npm run build
 
       - name: Package (${{ matrix.platform }})
@@ -127,7 +124,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --${{ matrix.platform }} --config --publish never
 
-      - name: List build artifacts
+      - name: List artifacts
         shell: bash
         run: ls -lh dist/
 
@@ -170,14 +167,15 @@ jobs:
         shell: bash
         run: |
           VER="${{ needs.prepare.outputs.version }}"
-          cat > release-notes.md << EOF
+          COMMITS=$(git log --oneline -10 --no-decorate)
+          cat > release-notes.md << NOTES
           ## Study Helper ${VER}
 
           ### 다운로드
 
           | 플랫폼 | 파일 |
           |--------|------|
-          | Windows | \`study-helper-app-${VER}-setup.exe\` |
+          | Windows | \`Study Helper-${VER}-setup.exe\` |
           | macOS (Intel) | \`Study Helper-${VER}-x64.dmg\` |
           | macOS (Apple Silicon) | \`Study Helper-${VER}-arm64.dmg\` |
 
@@ -188,8 +186,18 @@ jobs:
 
           ### 최근 변경사항
 
-          $(git log --oneline -10 --no-decorate)
-          EOF
+          ${COMMITS}
+          NOTES
+
+      # workflow_dispatch 시 태그가 없으면 생성
+      - name: Ensure tag exists
+        shell: bash
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
