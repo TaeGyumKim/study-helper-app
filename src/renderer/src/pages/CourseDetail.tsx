@@ -189,10 +189,16 @@ function CourseDetail(): JSX.Element {
     load()
   }, [courseIdx, navigate])
 
+  const [playError, setPlayError] = useState<string | null>(null)
+
   useEffect(() => {
     const unsub = window.electronAPI.onPlayProgress((state) => {
-      if (state.ended) {
+      if (state.error) {
         setPlaying(null)
+        setPlayError(state.error)
+      } else if (state.ended) {
+        setPlaying(null)
+        setPlayError(null)
         loadDetail()
       }
     })
@@ -201,6 +207,7 @@ function CourseDetail(): JSX.Element {
 
   async function handlePlay(lec: LectureItem): Promise<void> {
     setPlaying(lec.fullUrl)
+    setPlayError(null)
     try {
       const dur = parseDuration(lec.duration)
       const result = await window.electronAPI.playLecture(lec.fullUrl, dur)
@@ -318,6 +325,19 @@ function CourseDetail(): JSX.Element {
           </p>
         )}
       </div>
+
+      {/* 재생 에러 배너 */}
+      {playError && (
+        <div className="mx-6 mt-4 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 dark:bg-red-900/20">
+          <span className="text-sm text-red-600 dark:text-red-400">재생 오류: {playError}</span>
+          <button
+            onClick={() => setPlayError(null)}
+            className="ml-4 text-xs text-red-400 hover:text-red-600"
+          >
+            닫기
+          </button>
+        </div>
+      )}
 
       {/* 주차별 강의 목록 */}
       <div className="space-y-6 p-6">

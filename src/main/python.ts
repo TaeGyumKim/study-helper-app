@@ -15,12 +15,16 @@ const HEALTH_CHECK_INTERVAL = 3000 // ms
 const STARTUP_TIMEOUT = 30000 // ms
 const DEFAULT_PORT = 18090
 
+const MAX_RESTART_ATTEMPTS = 5
+const RESTART_BACKOFF_BASE = 3000 // ms
+
 export class PythonCore {
   private process: ChildProcess | null = null
   private healthTimer: ReturnType<typeof setInterval> | null = null
   private _port: number = DEFAULT_PORT
   private _token: string = ''
   private _isRunning = false
+  private _restartCount = 0
 
   get port(): number {
     return this._port
@@ -185,6 +189,7 @@ export class PythonCore {
 
   /**
    * 헬스 체크를 수행하고, 실패 시 재시작한다.
+   * 연속 실패 시 exponential backoff + 최대 재시도 제한.
    */
   private async healthCheck(): Promise<void> {
     try {
@@ -193,13 +198,34 @@ export class PythonCore {
         signal: AbortSignal.timeout(5000)
       })
       if (!res.ok) throw new Error(`Status ${res.status}`)
+      // 성공 시 재시작 카운터 리셋
+      this._restartCount = 0
     } catch {
-      console.warn('[PythonCore] Health check failed, restarting...')
+      if (this._restartCount >= MAX_RESTART_ATTEMPTS) {
+        console.error(
+          `[PythonCore] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached. Giving up.`
+        )
+        this._isRunning = false
+        if (this.healthTimer) {
+          clearInterval(this.healthTimer)
+          this.healthTimer = null
+        }
+        return
+      }
+
+      this._restartCount++
+      const backoff = RESTART_BACKOFF_BASE * Math.pow(2, this._restartCount - 1)
+      console.warn(
+        `[PythonCore] Health check failed (${this._restartCount}/${MAX_RESTART_ATTEMPTS}), restarting in ${backoff}ms...`
+      )
       this._isRunning = false
-      const prevToken = this._token // 토큰 유지 (렌더러 캐시와 동기화)
+      const prevToken = this._token
+
+      await new Promise((r) => setTimeout(r, backoff))
+
       this.stop()
       try {
-        this._token = prevToken // 재시작 시 같은 토큰 사용
+        this._token = prevToken
         await this.start()
       } catch (e) {
         console.error('[PythonCore] Restart failed:', e)
