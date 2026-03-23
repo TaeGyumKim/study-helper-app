@@ -18,13 +18,23 @@ const DEFAULT_PORT = 18090
 const MAX_RESTART_ATTEMPTS = 5
 const RESTART_BACKOFF_BASE = 3000 // ms
 
+function log(...args: unknown[]): void {
+  if (!app.isPackaged) console.log(...args)
+}
+
+function logError(...args: unknown[]): void {
+  if (!app.isPackaged) console.error(...args)
+}
+
 export class PythonCore {
   private process: ChildProcess | null = null
   private healthTimer: ReturnType<typeof setInterval> | null = null
+  private forceKillTimer: ReturnType<typeof setTimeout> | null = null
   private _port: number = DEFAULT_PORT
   private _token: string = ''
   private _isRunning = false
   private _restartCount = 0
+  private _restarting = false
 
   get port(): number {
     return this._port
@@ -58,9 +68,8 @@ export class PythonCore {
       STUDY_HELPER_DATA_DIR: dataDir
     }
 
-    console.log(`[PythonCore] Starting: ${pythonPath}`)
-    console.log(`[PythonCore] Data dir: ${dataDir}`)
-    console.log(`[PythonCore] Port: ${this._port}`)
+    log(`[PythonCore] Starting: ${pythonPath}`)
+    log(`[PythonCore] Port: ${this._port}`)
 
     this.process = spawn(pythonPath, ['-m', 'src.api.server'], {
       env,
@@ -71,7 +80,7 @@ export class PythonCore {
     // spawn error 핸들링 (ENOENT 등) — uncaught exception 방지
     const spawnReady = new Promise<void>((resolve, reject) => {
       this.process!.on('error', (err) => {
-        console.error(`[PythonCore] Spawn error: ${err.message}`)
+        logError(`[PythonCore] Spawn error: ${err.message}`)
         this._isRunning = false
         reject(err)
       })
@@ -79,15 +88,15 @@ export class PythonCore {
     })
 
     this.process.stdout?.on('data', (data: Buffer) => {
-      console.log(`[Python] ${data.toString().trim()}`)
+      log(`[Python] ${data.toString().trim()}`)
     })
 
     this.process.stderr?.on('data', (data: Buffer) => {
-      console.error(`[Python] ${data.toString().trim()}`)
+      logError(`[Python] ${data.toString().trim()}`)
     })
 
     this.process.on('exit', (code) => {
-      console.log(`[PythonCore] Process exited with code ${code}`)
+      log(`[PythonCore] Process exited with code ${code}`)
       this._isRunning = false
     })
 
@@ -111,19 +120,25 @@ export class PythonCore {
       this.healthTimer = null
     }
 
+    if (this.forceKillTimer) {
+      clearTimeout(this.forceKillTimer)
+      this.forceKillTimer = null
+    }
+
     if (this.process) {
-      console.log('[PythonCore] Stopping...')
+      log('[PythonCore] Stopping...')
       const proc = this.process
       proc.kill('SIGTERM')
       this.process = null
       this._isRunning = false
 
       // 3초 후에도 살아있으면 강제 종료 (로컬 변수로 캡처)
-      setTimeout(() => {
+      this.forceKillTimer = setTimeout(() => {
         if (!proc.killed) {
-          console.log('[PythonCore] Force killing...')
+          log('[PythonCore] Force killing...')
           proc.kill('SIGKILL')
         }
+        this.forceKillTimer = null
       }, 3000)
     }
   }
@@ -176,7 +191,7 @@ export class PythonCore {
           headers: this._token ? { Authorization: `Bearer ${this._token}` } : {}
         })
         if (res.ok) {
-          console.log('[PythonCore] Server ready')
+          log('[PythonCore] Server ready')
           return
         }
       } catch {
@@ -192,6 +207,8 @@ export class PythonCore {
    * 연속 실패 시 exponential backoff + 최대 재시도 제한.
    */
   private async healthCheck(): Promise<void> {
+    if (this._restarting) return // 재시작 중 중복 호출 무시
+
     try {
       const res = await fetch(`http://127.0.0.1:${this._port}/health`, {
         headers: this._token ? { Authorization: `Bearer ${this._token}` } : {},
@@ -202,7 +219,7 @@ export class PythonCore {
       this._restartCount = 0
     } catch {
       if (this._restartCount >= MAX_RESTART_ATTEMPTS) {
-        console.error(
+        logError(
           `[PythonCore] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached. Giving up.`
         )
         this._isRunning = false
@@ -218,17 +235,21 @@ export class PythonCore {
       console.warn(
         `[PythonCore] Health check failed (${this._restartCount}/${MAX_RESTART_ATTEMPTS}), restarting in ${backoff}ms...`
       )
+
+      this._restarting = true
       this._isRunning = false
       const prevToken = this._token
 
-      await new Promise((r) => setTimeout(r, backoff))
-
-      this.stop()
       try {
+        await new Promise((r) => setTimeout(r, backoff))
+
+        this.stop()
         this._token = prevToken
         await this.start()
       } catch (e) {
-        console.error('[PythonCore] Restart failed:', e)
+        logError('[PythonCore] Restart failed:', e)
+      } finally {
+        this._restarting = false
       }
     }
   }

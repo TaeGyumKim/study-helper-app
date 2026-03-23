@@ -130,9 +130,11 @@ function CourseDetail(): JSX.Element {
   const [detail, setDetail] = useState<CourseDetailType | null>(null)
   const [loading, setLoading] = useState(true)
   const [playing, setPlaying] = useState<string | null>(null)
+  const [playError, setPlayError] = useState<string | null>(null)
   const [pipeline, setPipeline] = useState<PipelineState | null>(null)
   const [pythonReady, setPythonReady] = useState(false)
   const detailRef = useRef<CourseDetailType | null>(null)
+  const pipelineWsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
     detailRef.current = detail
@@ -142,7 +144,9 @@ function CourseDetail(): JSX.Element {
   useEffect(() => {
     window.electronAPI.getPythonStatus().then((s) => {
       setPythonReady(s.running)
-      if (s.running) initApiClient().catch(() => {})
+      if (s.running) {
+        initApiClient().catch(() => setPythonReady(false))
+      }
     })
   }, [])
 
@@ -160,10 +164,10 @@ function CourseDetail(): JSX.Element {
   useEffect(() => {
     async function load(): Promise<void> {
       const store = getStore()
-      const idx = parseInt(courseIdx || '0')
+      const idx = parseInt(courseIdx || '0', 10)
 
       // 캐시에서 course 조회 (fetchCourses 재호출 불필요)
-      if (idx < 0 || idx >= store.courses.length) {
+      if (isNaN(idx) || idx < 0 || idx >= store.courses.length) {
         navigate('/courses')
         return
       }
@@ -189,8 +193,6 @@ function CourseDetail(): JSX.Element {
     load()
   }, [courseIdx, navigate])
 
-  const [playError, setPlayError] = useState<string | null>(null)
-
   useEffect(() => {
     const unsub = window.electronAPI.onPlayProgress((state) => {
       if (state.error) {
@@ -215,7 +217,7 @@ function CourseDetail(): JSX.Element {
         await loadDetail()
       }
     } catch (e) {
-      console.error('재생 실패:', e)
+      setPlayError(e instanceof Error ? e.message : '재생 중 오류가 발생했습니다.')
     } finally {
       setPlaying(null)
     }
@@ -243,7 +245,7 @@ function CourseDetail(): JSX.Element {
 
       // 파이프라인 실행
       await initApiClient()
-      runPipeline(
+      pipelineWsRef.current = runPipeline(
         {
           video_url: videoUrl,
           lecture_title: lec.title,
@@ -304,7 +306,13 @@ function CourseDetail(): JSX.Element {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* 파이프라인 모달 */}
       {pipeline && (
-        <PipelineModal state={pipeline} onClose={() => setPipeline(null)} />
+        <PipelineModal state={pipeline} onClose={() => {
+          if (pipelineWsRef.current) {
+            pipelineWsRef.current.close()
+            pipelineWsRef.current = null
+          }
+          setPipeline(null)
+        }} />
       )}
 
       {/* 헤더 */}
@@ -362,8 +370,8 @@ function CourseDetail(): JSX.Element {
               </div>
 
               <div className="divide-y dark:divide-gray-700">
-                {week.videoLectures.map((lec, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-3">
+                {week.videoLectures.map((lec) => (
+                  <div key={lec.fullUrl} className="flex items-center justify-between px-5 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span
