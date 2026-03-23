@@ -97,7 +97,9 @@ export class PythonCore {
 
     this.process.on('exit', (code) => {
       log(`[PythonCore] Process exited with code ${code}`)
-      this._isRunning = false
+      if (!this._restarting) {
+        this._isRunning = false
+      }
     })
 
     // 프로세스 spawn 대기 (ENOENT면 여기서 throw)

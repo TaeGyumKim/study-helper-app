@@ -124,11 +124,20 @@ export function runPipeline(
   }
 
   ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data) as PipelineMessage
-    onMessage(msg)
-    if (msg.type === 'complete' || msg.type === 'error') {
+    try {
+      const msg = JSON.parse(event.data) as PipelineMessage
+      onMessage(msg)
+      if (msg.type === 'complete' || msg.type === 'error') {
+        ws.close()
+      }
+    } catch (e) {
+      onMessage({ type: 'error', message: `응답 파싱 오류: ${e instanceof Error ? e.message : e}` })
       ws.close()
     }
+  }
+
+  ws.onerror = () => {
+    onMessage({ type: 'error', message: '파이프라인 연결 오류' })
   }
 
   return ws
